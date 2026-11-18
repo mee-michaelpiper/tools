@@ -1,0 +1,1 @@
+Nie eingebunden (keine Registrierung im DI), ersetzt durch PlantSettings in /portal/einstellungen (22.10.2026).

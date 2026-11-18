@@ -1,0 +1,6 @@
+ENHANCEMENT 1  .
+*
+  if YCL_SDWS_INTERFACE_ALL=>MO_INSTANCE is BOUND.
+    I_OBJ_NOT_CHK = abap_true.
+  endif.
+ENDENHANCEMENT.

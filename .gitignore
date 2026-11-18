@@ -1,0 +1,23 @@
+# Werkzeuge ja, Daten nie (Regel: ~/.claude/CLAUDE.md „Projektstruktur und Ablage“)
+**/exports/
+**/data/
+**/localfeed/
+**/*.log
+**/dev_rfc.log
+*.csv
+*.xlsx
+*.xls
+*.zip
+*.pfx
+*.pem
+*.key
+.env
+*.local.*
+[Bb]in/
+[Oo]bj/
+.venv/
+__pycache__/
+.DS_Store
+.idea/
+.vs/
+*.user
