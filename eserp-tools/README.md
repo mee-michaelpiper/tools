@@ -2,3 +2,4 @@
 
 - `ApiMovementProbe` – nur lesen: was `GET /lager/bewegungen` je Datumsfenster für eine Bewegungsnummer liefert (URL, Anzahl, Roh-JSON). `dotnet run -- 630012991 "2026-10-21T00:00:00|2026-10-22T00:00:00"` (VPN, net10.0 – unter net9.0 TLS-Fehler RemoteCertificateNameMismatch).
 - `EsSqlRead` – nur lesend: SQL gegen das esERP (vmsql005\ES2000, esdata_live = Prod). `./run.sh "SELECT …"`. Tabellenaufbau siehe `EsSqlRead/README.md`.
+- `PermissionCompare` – Rechte-Vergleich vor/nach dem Wechsel des SiSe-Portals auf `Meesenburg.SiSe.Authorization` (19.11.2026): liest Rollen und Zuweisungen aus `Prod-ES-Portal` **nur**, kopiert sie in die lokale Aspire-Mongo, löst für jede Person/Gruppe mit altem (ES.Authorization 1.0.15, Projektquelle) und neuem Paket auf und zeigt, was der erste Start an Startrollen ändert. `./run.sh` (braucht laufende lokale Mongo, az-Anmeldung, GitHub-Token im Schlüsselbund). Ergebnis 19.11.: 10 Fälle, 0 Abweichungen; erster Start nur Merker.
