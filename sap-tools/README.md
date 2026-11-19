@@ -20,6 +20,7 @@ SAPSYS=MEP dotnet run --no-build -- spool YFI_ES_ERP_BUCHUNGEN 20004200    # Spo
 - `tools/BapiCheck` – nur lesend: SAP_Export-CSV wie YFI_UEBERGABE_BELEGE_ES2000 aufbauen und BAPI_ACC_DOCUMENT_CHECK (bucht nicht).
 - `tools/SpoolParseTest` – Test für `SAPBroker.ParseTransferSpool` (Spoolliste des Übergabe-Reports) gegen eine echte Spool-Ausgabe von `SapRead spool`.
 - `tools/LaterExportsTest` – Test für `AccountingTransferService.FindLaterExportsAsync` gegen die echte Freigabe (nur lesen, SMB-Zugang aus dem Key Vault per az).
+- `tools/SmbChunkWriteTest` – Test für `SmbFileStream` des Workers (Datei per Link eingebunden) gegen die echte Freigabe, schreibt nur in MEQ `SiSe-Test` und löscht wieder: alter Weg (ganze Datei in einem WriteFile) muss ab 1 MiB mit „Not enough credits“ scheitern, neuer Weg 50 Dateien bis 8 MiB in einer Sitzung schreiben. `SMB_CREDS` aus `AdminSmbCredentials`, `dotnet run`. Anlass: Abbruch Abendexport 08./18.11.2026.
 - `tools/TransferFileInspect` – alle Fassungen einer Übergabedatei (abgelehnt, Prüfung, ersetzt, gebucht …) mit den Zeilen bestimmter Referenzen zeigen, nur lesen: `dotnet run -- 20261109_183018 900010703 900010704`.
 - `tools/SupplierMappingTest` – Test der Lieferanten-Umwandlung im Worker (Projektreferenz): Rechnungssteller W0100 (Lieferant 2) wird übersprungen, der Rest umgewandelt. `dotnet run`.
 - `tools/CsvEscapeTest` – Maskieren in der Übergabe-CSV (Worker `CsvHelpers.EscapeField`): Steuerzeichen/„;“ erzeugen keine Zeile/Spalte. `dotnet run`.
