@@ -2,7 +2,7 @@
 # GitHub Actions → Azure ohne Secrets (OIDC, Federated Credentials), 19.11.2026 – Schritt 2 „Deploy über GitHub Actions“.
 # Mit dem Admin-Profil ausführen (Entra: App-Registrierungen anlegen; Azure: Rollen auf ACR und AKS vergeben).
 # Legt an (idempotent – ein zweiter Lauf ändert nichts):
-#   github-actions-build   AcrPush auf crmeesenburg; vertraut den Repos es-integration und sise-shop, nur in deren GitHub-Umgebung „build“
+#   github-actions-build   AcrPush + Container Registry Tasks Contributor auf crmeesenburg; vertraut den Repos es-integration und sise-shop, nur in deren GitHub-Umgebung „build“
 #   github-actions-deploy  AKS-Zugriff nur auf die Namespaces mee-eserp, mee-siseshop-test, mee-siseshop; vertraut nur infra, Umgebungen „test“/„prod“
 # Getrennt, damit ein Build-Workflow nie im Cluster schreiben kann und der Deploy nie Images verändert.
 # Free-Plan (20.11.2026): private Repos haben dort keine GitHub-Umgebungen. Deshalb zusätzlich je ein Eintrag „nur Branch main“
@@ -59,6 +59,9 @@ fed "$BUILD" sise-shop-build "repo:$ORG@$ORG_ID/$SHOP_REPO:environment:build"
 fed "$BUILD" es-integration-main "repo:$ORG@$ORG_ID/$ES_REPO:ref:refs/heads/main"   # Free-Plan, später löschen
 fed "$BUILD" sise-shop-main "repo:$ORG@$ORG_ID/$SHOP_REPO:ref:refs/heads/main"             # Free-Plan, später löschen
 role "$BUILD" AcrPush "$ACR_ID"
+# az acr build läuft als ACR Task: braucht die Registry als Azure-Ressource (lesen, Quelle hochladen, Lauf starten, Protokoll) –
+# AcrPush allein reicht nicht („resource crmeesenburg could not be found“, 20.11.2026)
+role "$BUILD" "Container Registry Tasks Contributor" "$ACR_ID"
 
 echo "== github-actions-deploy"
 DEPLOY=$(app github-actions-deploy)
