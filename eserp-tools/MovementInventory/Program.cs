@@ -7,7 +7,7 @@
 // an SAP geht, entscheidet derselbe AccountingMatToSapMapper wie im Worker.
 //
 // Aufruf: dotnet run -- [--from 2026-09-01] [--write]
-//   ohne --write: nur Bericht (Konsole + out/bewegungen_<Datum>.csv, bleibt lokal – enthält Lager-/Kundenbezeichnungen)
+//   ohne --write: nur Bericht (Konsole + out/bewegungen_<Datum>.csv + out/fehlende_bewegungen_<Datum>.xlsx, bleibt lokal)
 //   mit  --write: zusätzlich das Bewegungsbuch Prod-ES-Worker/Accounting-Movements befüllen (Upsert je Bewegungsnummer)
 using System.Diagnostics;
 using System.Globalization;
@@ -144,6 +144,68 @@ await File.WriteAllLinesAsync(report, ["Bewegung;Datum;Status;SAP-Beleg;Dateien;
     .. rows.Select(r => $"{r.m.MovementNumber};{r.m.MovementDate:yyyy-MM-dd HH:mm};{r.status};{r.doc};{string.Join(" | ", r.files)};{r.m.WarehouseNumber};{r.m.ArticleNumber};{r.m.Quantity.ToString(CultureInfo.GetCultureInfo("de-DE"))}")],
     new UTF8Encoding(true));
 Console.WriteLine($"\nListe: {Path.GetFullPath(report)}");
+
+// ---------------------------------------------------------------- 4b. Schlanke Excel der fehlenden Bewegungen (zur Prüfung durch die Fibu)
+// Je Bewegung: was esERP liefert und wie der Worker sie buchen würde (Soll/Haben, Betrag, Kostenstelle/Auftrag) – dazu ein Hinweis zur Ursache.
+var missing = rows.Where(r => r.status == "Fehlt").ToList();
+if (missing.Count > 0)
+{
+    // Abgleich 16.11.2026 (sap-tools/tools/MaterialGapAnalysis): beim Export ohne Preis (0 €), Preis erst danach in esERP gesetzt
+    var priceLater = new HashSet<int> { 630012989, 630012991, 630014332 };
+    for (var n = 630013664; n <= 630013680; n += 2) priceLater.Add(n);
+    string Hint(AccountingMat m)
+    {
+        var d = DateOnly.FromDateTime(m.MovementDate);
+        if (d == today) return "von heute – geht mit dem nächsten Abendexport automatisch";
+        if (d == new DateOnly(2026, 11, 19)) return "Abfragefenster 19.11. (esERP filtert nur nach Datum) – geht mit dem nächsten Abendexport automatisch";
+        if (priceLater.Contains(m.MovementNumber)) return "beim Export ohne Preis (0 €), Preis später in esERP nachgetragen";
+        return "nie übergeben – Ursache offen (vermutlich ebenfalls ohne Preis oder Kostenstelle zum Exportzeitpunkt)";
+    }
+    using var wb = new ClosedXML.Excel.XLWorkbook();
+    var ws = wb.Worksheets.Add("Fehlende Bewegungen");
+    string[] head = ["Bewegung", "Datum", "Bewegungsart", "Lager", "Artikel", "Bezeichnung", "Menge", "Betrag €", "Soll-Konto", "Haben-Konto",
+                     "Kostenstelle", "Auftrag (esERP)", "Lieferschein", "Hinweis", "Prüfung Buchhaltung"];
+    for (var i = 0; i < head.Length; i++) ws.Cell(1, i + 1).Value = head[i];
+    var row = 2;
+    foreach (var (m, _, _, _) in missing.OrderBy(r => r.m.MovementDate))
+    {
+        var doc = mapper.MapToSapDocument(m);
+        var debit = doc?.Items.FirstOrDefault(i => i.Buchungsschluessel == "40");
+        var credit = doc?.Items.FirstOrDefault(i => i.Buchungsschluessel == "50");
+        var amount = debit?.BetragBelegwaehrungFW ?? credit?.BetragBelegwaehrungFW;
+        ws.Cell(row, 1).Value = m.MovementNumber;
+        ws.Cell(row, 2).Value = m.MovementDate;
+        ws.Cell(row, 3).Value = m.MovementDescription ?? "";
+        ws.Cell(row, 4).Value = m.WarehouseNumber;
+        ws.Cell(row, 5).Value = m.ArticleNumber ?? "";
+        ws.Cell(row, 6).Value = m.ArticleDescription1 ?? "";
+        ws.Cell(row, 7).Value = m.Quantity;
+        if (amount is { } a) ws.Cell(row, 8).Value = a;
+        ws.Cell(row, 9).Value = debit?.Konto ?? "";
+        ws.Cell(row, 10).Value = credit?.Konto ?? "";
+        ws.Cell(row, 11).Value = m.CostCenter ?? "";
+        if (m.OrderNumber != 0) ws.Cell(row, 12).Value = m.OrderNumber;
+        if (m.DeliveryNoteNumber != 0) ws.Cell(row, 13).Value = m.DeliveryNoteNumber;
+        ws.Cell(row, 14).Value = Hint(m);
+        row++;
+    }
+    ws.Cell(row, 7).Value = "Summe";
+    ws.Cell(row, 8).FormulaA1 = $"SUM(H2:H{row - 1})";
+    ws.Row(row).Style.Font.Bold = true;
+    ws.Column(2).Style.DateFormat.Format = "dd.mm.yyyy hh:mm";
+    ws.Column(7).Style.NumberFormat.Format = "#,##0.###";
+    ws.Column(8).Style.NumberFormat.Format = "#,##0.00";
+    var header = ws.Row(1);
+    header.Style.Font.Bold = true;
+    header.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromHtml("#DDE7F0");
+    ws.Range(1, 1, row - 1, head.Length).SetAutoFilter();
+    ws.SheetView.FreezeRows(1);
+    ws.Columns().AdjustToContents(1, row, 8, 60);
+    ws.Column(15).Width = 30;
+    var xlsx = $"out/fehlende_bewegungen_{today:yyyyMMdd}.xlsx";
+    wb.SaveAs(xlsx);
+    Console.WriteLine($"Excel fehlende Bewegungen: {Path.GetFullPath(xlsx)}");
+}
 
 // ---------------------------------------------------------------- 5. Bewegungsbuch befüllen
 if (!write) { Console.WriteLine("Bewegungsbuch unverändert (ohne --write)."); return; }
