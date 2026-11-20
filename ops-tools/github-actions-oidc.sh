@@ -12,6 +12,13 @@
 set -euo pipefail
 
 ORG="Meesenburg-GmbH"
+# GitHub schickt bei dieser Organisation das Subject mit unveränderlichen IDs (repo:<org>@<org-id>/<repo>@<repo-id>:…, 20.11.2026 –
+# erster Lauf scheiterte mit AADSTS700213). Schützt davor, dass ein später gleichnamig angelegtes Repo vertraut wird.
+# IDs: Repo-Seite → Meta-Tags octolytics-dimension-user_id / -repository_id
+ORG_ID="357889096"
+ES_REPO="es-integration@1462538206"
+SHOP_REPO="sise-shop@1462539184"
+INFRA_REPO="infra@1461644878"
 TENANT="a7473855-450e-4993-befa-62446ec6444b"
 ACR_ID="/subscriptions/5b5ab2b8-1d9b-4822-8967-8f387ee117ce/resourceGroups/rg-hub/providers/Microsoft.ContainerRegistry/registries/crmeesenburg"
 AKS_ID="/subscriptions/7ad27b6e-b0f6-4c89-b9bf-6089bae5a24f/resourcegroups/rg-kubernetes-prod/providers/Microsoft.ContainerService/managedClusters/aks-meesenburg-prod"
@@ -27,10 +34,14 @@ app() { # Name → appId (anlegen, falls es sie noch nicht gibt)
   echo "$id"
 }
 
-fed() { # appId, Name, Subject
-  if az ad app federated-credential list --id "$1" --query "[?name=='$2'] | length(@)" -o tsv | grep -q '^1$'; then return; fi
-  az ad app federated-credential create --id "$1" --parameters "{\"name\":\"$2\",\"issuer\":\"https://token.actions.githubusercontent.com\",\"subject\":\"$3\",\"audiences\":[\"api://AzureADTokenExchange\"]}" >/dev/null
-  echo "  vertraut: $3"
+fed() { # appId, Name, Subject – legt an oder korrigiert das Subject eines bestehenden Eintrags
+  local body="{\"name\":\"$2\",\"issuer\":\"https://token.actions.githubusercontent.com\",\"subject\":\"$3\",\"audiences\":[\"api://AzureADTokenExchange\"]}"
+  local current; current=$(az ad app federated-credential list --id "$1" --query "[?name=='$2'].subject | [0]" -o tsv)
+  if [ -z "$current" ]; then
+    az ad app federated-credential create --id "$1" --parameters "$body" >/dev/null; echo "  vertraut: $3"
+  elif [ "$current" != "$3" ]; then
+    az ad app federated-credential update --id "$1" --federated-credential-id "$2" --parameters "$body" >/dev/null; echo "  korrigiert: $3"
+  fi
 }
 
 role() { # appId, Rolle, Scope
@@ -43,17 +54,17 @@ role() { # appId, Rolle, Scope
 
 echo "== github-actions-build"
 BUILD=$(app github-actions-build)
-fed "$BUILD" es-integration-build "repo:$ORG/es-integration:environment:build"
-fed "$BUILD" sise-shop-build "repo:$ORG/sise-shop:environment:build"
-fed "$BUILD" es-integration-main "repo:$ORG/es-integration:ref:refs/heads/main"   # Free-Plan, später löschen
-fed "$BUILD" sise-shop-main "repo:$ORG/sise-shop:ref:refs/heads/main"             # Free-Plan, später löschen
+fed "$BUILD" es-integration-build "repo:$ORG@$ORG_ID/$ES_REPO:environment:build"
+fed "$BUILD" sise-shop-build "repo:$ORG@$ORG_ID/$SHOP_REPO:environment:build"
+fed "$BUILD" es-integration-main "repo:$ORG@$ORG_ID/$ES_REPO:ref:refs/heads/main"   # Free-Plan, später löschen
+fed "$BUILD" sise-shop-main "repo:$ORG@$ORG_ID/$SHOP_REPO:ref:refs/heads/main"             # Free-Plan, später löschen
 role "$BUILD" AcrPush "$ACR_ID"
 
 echo "== github-actions-deploy"
 DEPLOY=$(app github-actions-deploy)
-fed "$DEPLOY" infra-test "repo:$ORG/infra:environment:test"
-fed "$DEPLOY" infra-prod "repo:$ORG/infra:environment:prod"
-fed "$DEPLOY" infra-main "repo:$ORG/infra:ref:refs/heads/main"                    # Free-Plan, später löschen
+fed "$DEPLOY" infra-test "repo:$ORG@$ORG_ID/$INFRA_REPO:environment:test"
+fed "$DEPLOY" infra-prod "repo:$ORG@$ORG_ID/$INFRA_REPO:environment:prod"
+fed "$DEPLOY" infra-main "repo:$ORG@$ORG_ID/$INFRA_REPO:ref:refs/heads/main"                    # Free-Plan, später löschen
 role "$DEPLOY" "Azure Kubernetes Service Cluster User Role" "$AKS_ID"
 for ns in "${NAMESPACES[@]}"; do role "$DEPLOY" "Azure Kubernetes Service RBAC Writer" "$AKS_ID/namespaces/$ns"; done
 
