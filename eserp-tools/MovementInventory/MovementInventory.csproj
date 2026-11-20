@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><NoWarn>NU1900;NU1903;CS8618;CS8602</NoWarn></PropertyGroup>
+  <ItemGroup>
+    <!-- Derselbe Mapper wie im Worker: entscheidet, welche Bewegung überhaupt an SAP geht -->
+    <ProjectReference Include="$(HOME)/repos/Meesenburg.ES/src/Meesenburg.ES.DataWorker/Meesenburg.ES.DataWorker.csproj" />
+    <PackageReference Include="SMBLibrary" Version="1.5.8.1" />
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.12.0" />
+    <PackageReference Include="MongoDB.Driver" Version="3.13.0" />
+  </ItemGroup>
+</Project>
