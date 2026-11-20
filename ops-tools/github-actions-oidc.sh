@@ -5,6 +5,9 @@
 #   github-actions-build   AcrPush auf crmeesenburg; vertraut den Repos es-integration und sise-shop, nur in deren GitHub-Umgebung „build“
 #   github-actions-deploy  AKS-Zugriff nur auf die Namespaces mee-eserp, mee-siseshop-test, mee-siseshop; vertraut nur infra, Umgebungen „test“/„prod“
 # Getrennt, damit ein Build-Workflow nie im Cluster schreiben kann und der Deploy nie Images verändert.
+# Free-Plan (20.11.2026): private Repos haben dort keine GitHub-Umgebungen. Deshalb zusätzlich je ein Eintrag „nur Branch main“
+# (Workflows ohne environment:, Start von main). Nach dem Wechsel auf GitHub Team: in den Workflows environment: ergänzen und die
+# main-Einträge löschen (sonst umgeht ein Lauf von main die Prod-Freigabe) – Befehl siehe ganz unten.
 # Gibt am Ende die IDs aus, die in GitHub als Variablen (nicht als Secrets – es sind keine) eingetragen werden.
 set -euo pipefail
 
@@ -42,12 +45,15 @@ echo "== github-actions-build"
 BUILD=$(app github-actions-build)
 fed "$BUILD" es-integration-build "repo:$ORG/es-integration:environment:build"
 fed "$BUILD" sise-shop-build "repo:$ORG/sise-shop:environment:build"
+fed "$BUILD" es-integration-main "repo:$ORG/es-integration:ref:refs/heads/main"   # Free-Plan, später löschen
+fed "$BUILD" sise-shop-main "repo:$ORG/sise-shop:ref:refs/heads/main"             # Free-Plan, später löschen
 role "$BUILD" AcrPush "$ACR_ID"
 
 echo "== github-actions-deploy"
 DEPLOY=$(app github-actions-deploy)
 fed "$DEPLOY" infra-test "repo:$ORG/infra:environment:test"
 fed "$DEPLOY" infra-prod "repo:$ORG/infra:environment:prod"
+fed "$DEPLOY" infra-main "repo:$ORG/infra:ref:refs/heads/main"                    # Free-Plan, später löschen
 role "$DEPLOY" "Azure Kubernetes Service Cluster User Role" "$AKS_ID"
 for ns in "${NAMESPACES[@]}"; do role "$DEPLOY" "Azure Kubernetes Service RBAC Writer" "$AKS_ID/namespaces/$ns"; done
 
@@ -59,3 +65,6 @@ echo "  AZURE_DEPLOY_CLIENT_ID = $DEPLOY"
 echo "  AZURE_ACR_SUBSCRIPTION = 5b5ab2b8-1d9b-4822-8967-8f387ee117ce"
 echo "  AZURE_AKS_SUBSCRIPTION = 7ad27b6e-b0f6-4c89-b9bf-6089bae5a24f"
 echo "Und je Repo die Umgebungen anlegen: es-integration + sise-shop → „build“, infra → „test“ und „prod“ (prod mit Freigabe durch dich)."
+echo "Free-Plan: Variablen je Repo (es-integration, sise-shop, infra) mit denselben Namen; nach dem Wechsel auf Team in die Organisation."
+# Nach dem Wechsel auf GitHub Team (Umgebungen in den Workflows aktiv):
+#   for a in "$BUILD:es-integration-main" "$BUILD:sise-shop-main" "$DEPLOY:infra-main"; do az ad app federated-credential delete --id "${a%%:*}" --federated-credential-id "${a##*:}"; done
