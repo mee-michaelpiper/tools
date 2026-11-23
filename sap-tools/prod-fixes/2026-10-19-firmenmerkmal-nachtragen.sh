@@ -7,7 +7,7 @@
 # Ausführen: zsh ~/repos/tools/sap-tools/prod-fixes/2026-10-19-firmenmerkmal-nachtragen.sh <pfad>/companyhint-backfill.json
 set -e
 DATA="${1:?Pfad zur JSON-Datei mit den Einträgen angeben}"
-cd ~/repos/sap-tools/tools/mongoinsert
+cd ~/repos/tools/sap-tools/tools/mongoinsert
 dotnet build -v q >/dev/null
 export MONGO_CS="$(az keyvault secret show --vault-name kv-meesenburg-prod -n MongoDBConnectionString --query value -o tsv)"
 dotnet run --no-build -- Prod-ES-Portal AuditLog "$DATA"
