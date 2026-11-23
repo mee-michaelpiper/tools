@@ -101,7 +101,7 @@ Set-Service sshd -StartupType Automatic
 Restart-Service sshd
 "--- lauscht ---"; Get-NetTCPConnection -State Listen -LocalPort $SshPort | Format-Table LocalAddress, LocalPort -AutoSize | Out-String
 "--- Firewall ---"; Get-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' | Get-NetFirewallAddressFilter | Format-List RemoteAddress | Out-String
-"--- Hostschluessel (an Claude/Mac zum Abgleich) ---"
+"--- Hostschluessel (an den Mac zum Abgleich) ---"
 & "$sshBin\ssh-keygen.exe" -lf "$sshDir\ssh_host_ed25519_key.pub"
 
 # Protokoll: Get-WinEvent -LogName 'OpenSSH/Operational' -MaxEvents 20
